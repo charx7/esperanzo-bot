@@ -1,174 +1,83 @@
 import json
 import requests
 import os
+import dotenv
 
 from esperanzo_bot import app # custom package import
 from esperanzo_bot import db
 from esperanzo_bot.models import Users, Todos
+from esperanzo_bot.bot import TelegramBot
 
 from flask import Flask
 from flask import request
 from flask import Response
 from flask_sqlalchemy import SQLAlchemy
 
-# get the BOT_TOKEN env variable -> this should be passed from run.py
+
+# Get env variables TODO should be separated
+dotenv.load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-
-def write_json(data, filename='response.json'):
-  '''
-    This function will write a json object into the directory
-
-    Args:
-      data (json): json object
-  '''
-  with open('./esperanzo_bot/' + filename, 'w') as f:
-    json.dump(data, f, indent=4, ensure_ascii=False)
-
-def send_message(chat_id, msg):
-  '''
-    Will send a message to the current given chat-id
-
-    Args:
-      chat_id (str): chat id in string format
-      msg (str): message to send
-    
-    Returns:
-      (tbd)
-  '''
-  url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
-  # define a json object to send via requests
-  json = {
-    'chat_id': chat_id,
-    'text': msg
-  }
-  r = requests.post(url, json=json)
-  return r
-
-def send_custom_keyboard(chat_id, msg, reply_list):
-  # construct the keyboard options
-  keyboard_ops = [{"text": todo, "callback_data": "/delete " + todo} for todo in reply_list]
-  print(keyboard_ops)
-
-  keyboard_replies =  { "inline_keyboard": [keyboard_ops]}
-
-  url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
-  # define a json object to send via requests
-  json = {
-    'chat_id': chat_id,
-    'text': msg,
-    'reply_markup': keyboard_replies
-  }
-
-  r = requests.post(url, json=json)
-  return r
-
-def send_callback_response(callback_query_id):
-  '''
-    Sends a response to a callback query from the telegram API
-  '''
-  url = f'https://api.telegram.org/bot{BOT_TOKEN}/answerCallbackQuery'
-  # define a json object to send via requests
-  json = {
-    'callback_query_id': callback_query_id,
-    'text': 'Deleted task 🧹'
-  }
-
-  return requests.post(url, json=json)
-  
-# @app.route('/webhook', methods=['GET'])
-# def webhook():
-#   '''
-#     Workaround to set the webhook -> should be another thing
-#   '''
-#   print('Setting the webhook for telegram')
-#   url = f'https://api.telegram.org/bot{BOT_TOKEN}/setWebHook?url={NGROK_URL}'
-#   print(url)
-#   res = requests.get(url)
-#   json_res = res.json()
-  
-#   print(json_res['description'])
-
-#   return json_res
+NGROK_URL = os.getenv('NGROK_URL')      
+TelegramBot.webhook(BOT_TOKEN, NGROK_URL)
+bot = TelegramBot(BOT_TOKEN)
 
 @app.route("/", methods = ['POST', 'GET'])
 def index():
   if request.method == 'POST':
-    msg = request.get_json() # the msg obj will be a json sent by telegram
-    write_json(msg, 'telegram_request.json')
+    msg = request.get_json()
+    bot.write_json(msg, 'telegram_request.json')
 
-    # TODO this is a weird logic should change it
+    # set the type of the msg
     try:
       msg['callback_query']
-      msg_type = 'callback'
-    except KeyError:
-      msg_type = 'user_text'
-    
-    if msg_type == 'user_text':
-      chat_id = msg['message']['chat']['id'] # get the chat id to respond
-      msg_from = msg['message']['from']['id'] # get the id of the person that sent the msg
-    else:
-      callback_query_id = msg['callback_query']['id'] 
-      msg_from = msg['callback_query']['message']['from']['id']
-      callback_data = msg['callback_query']['data']
+      bot.msg_type = 'callback'
+      bot.chat_id = msg['callback_query']['message']['chat']['id'] # get the chat id to respond
+      bot.msg_from = msg['callback_query']['from']['id'] # get the id of the person that sent the msg
+      bot.msg_text = msg['callback_query']['data']
+      bot.first_name = msg['callback_query']['message']['from']['first_name']
+      bot.user_name = msg['callback_query']['message']['from']['username']
       
-    #########################################################################
-    ##### Switch statements TODO: this should be processed via NLP and intent
-    #########################################################################
-    # TODO this is also wrong should be changed
-    if msg_type == 'callback':
-      msg_text = callback_data
-    else:
-      msg_text = msg['message']['text']
-
-    #### /greet command logic
-    if msg_text == '/greet':
-      send_message(chat_id, 'Hey Patrona! 👋')
-
-      return Response('ok', status = 200) # have to return 200 so telegram doesnt explode?
+    except KeyError:
+      bot.msg_type = 'user_text'
+      bot.chat_id = msg['message']['chat']['id'] # get the chat id to respond
+      bot.msg_from = msg['message']['from']['id'] # get the id of the person that sent the msg
+      bot.msg_text = msg['message']['text']
+      bot.first_name = msg['message']['from']['first_name']
+      bot.user_name = msg['message']['from']['username']
     
-    #### /register command
-    elif msg_text == '/register':
-      # check if the user already exists on the 'Users' table
-      found_user = Users.query.filter_by(id = msg_from).first()
+    ### /greet command logic
+    if bot.msg_text == '/greet':
+      bot.send_message('Hey Patrona! 👋')
 
+    ### /add command logic
+    elif bot.msg_text[:4] == '/add':
+      todo_text = bot.msg_text[4:].strip()
+      found_user = Users.query.filter_by(id = bot.msg_from).first()
+      
       if found_user:
-        send_message(chat_id, 'You are already registered :P /add to add a `TODO`.')
-        return Response('ok', status = 200)
-
+        todo_to_add = Todos(todo_text=todo_text, owner_id=bot.msg_from)  
+        db.session.add(todo_to_add)
+        db.session.commit()
+        bot.send_message('Added your new task.')
       else:
-        f_n = msg['message']['from']['first_name']
-        u_n = msg['message']['from']['username']
-        new_usr = Users(id = msg_from, first_name = f_n, last_name= u_n)
+        print('Registering new user')
+        # if we dont find any user we register it
+        new_usr = Users(id = msg_from, first_name = bot.first_name, last_name= bot.last_name)
         db.session.add(new_usr)
         db.session.commit() # TODO there is no way of knowing if the insert was succesful :/?
 
-        send_message(chat_id, 'NICE! Now you can add a `TODO` by using the `/add <TEXT>` command 👨‍💻')
-        
-        return Response('ok', status=200)
-    
-    #### /add command
-    elif msg_text[:4] == '/add':
-      found_user = Users.query.filter_by(id = msg_from).first()
-      if found_user:
-        todo_text = msg_text[4:].strip()
-        todo_to_add = Todos(todo_text=todo_text, owner_id=msg_from)
+        # add the todo 
+        todo_to_add = Todos(todo_text=todo_text, owner_id=bot.msg_from)  
         db.session.add(todo_to_add)
         db.session.commit()
-        send_message(chat_id, 'Added your new task.')
-        
-        return Response('ok', status = 200)
-
-      else:
-        send_message(chat_id, 'You need to register yourself via the /register command first :(')
-        return Response('ok', status = 200)
+        bot.send_message('Added your new task.')
     
     #### /remind command
-    elif msg_text == '/remind':
+    elif bot.msg_text == '/remind':
       # case1 they are not registered
       # case2 they dont have any todos
       # case3 return a list of all the todos
-
-      found_user = Users.query.filter_by(id = msg_from).first()
+      found_user = Users.query.filter_by(id = bot.msg_from).first()
       if found_user:
         # query all the todos of the user
         if len(found_user.todos) > 0:
@@ -176,35 +85,69 @@ def index():
           for todo in found_user.todos:
             curr_text = todo.todo_text
             bot_response = bot_response + '\n -' + curr_text
-          send_message(chat_id, bot_response) # respond with the builded list
+          bot.send_message(bot_response) # respond with the builded list
         else:
-          send_message(chat_id, 'You dont have any pending tasks yei!') # respond with the builded list
+          bot.send_message('You dont have any pending tasks yei!') # respond with the builded list
       
-    elif msg_text == '/remove':
+    # output Remove list bot command
+    elif bot.msg_text == '/remove':
       # get the todo list
-      found_user = Users.query.filter_by(id = msg_from).first()
-      if found_user:
+      found_user = Users.query.filter_by(id = bot.msg_from).first()
+      if found_user:  
         todo_list = []
         if len(found_user.todos) > 0:
             for todo in found_user.todos:
               todo_list.append(todo.todo_text) 
-        
-        res = send_custom_keyboard(chat_id, 'Please select one of the tasks to delete:', todo_list)
-      
+        print('sending list: ', todo_list)
+        res = bot.send_custom_keyboard('Please select one of the tasks to delete:', todo_list)
       else:
-        send_message(chat_id, 'You dont have any pending tasks yei!')
-      
-      return Response('ok', status = 200)
+        bot.send_message('You dont have any pending tasks yei!')
     
-    # TODO the logic of parsing callback and simple commands should be separated
-    elif msg_type == 'callback':
+    # remove a specific task
+    elif bot.msg_text[:7] == '/delete':
+      found_user = Users.query.filter_by(id = bot.msg_from).first()
+      if found_user:  
+        print('should delete a specific todo')
+      else:
+        bot.send_message('You dont have any pending tasks yeah!')
       
-      # send the answer to the delete callback query
-      res = send_callback_response(callback_query_id)
-      write_json(res.json(), 'telegram_request.json') # TODO need to define what to do with the json
-
-    # we have to return the 200 response code so that telegram gets that we have received its msg
+  #     callback_query_id = msg['callback_query']['id'] 
+  #     msg_from = msg['callback_query']['message']['from']['id']
+  #     callback_data = msg['callback_query']['data']
+     
     return Response('ok', status=200)
 
-  else:
-    return '<h1> Esperanzo todo Bot </h1>'
+  # if request.method == 'POST':
+  #   msg = request.get_json() # the msg obj will be a json sent by telegram
+  #   write_json(msg, 'telegram_request.json')
+
+  #   # TODO this is a weird logic should change it
+  #   try:
+  #     msg['callback_query']
+  #     msg_type = 'callback'
+  #   except KeyError:
+  #     msg_type = 'user_text'
+    
+  #   if msg_type == 'user_text':
+  #     chat_id = msg['message']['chat']['id'] # get the chat id to respond
+  #     msg_from = msg['message']['from']['id'] # get the id of the person that sent the msg
+  #   else:
+  #     callback_query_id = msg['callback_query']['id'] 
+  #     msg_from = msg['callback_query']['message']['from']['id']
+  #     callback_data = msg['callback_query']['data']
+
+
+      
+    
+  #   # TODO the logic of parsing callback and simple commands should be separated
+  #   elif msg_type == 'callback':
+      
+  #     # send the answer to the delete callback query
+  #     res = send_callback_response(callback_query_id)
+  #     write_json(res.json(), 'telegram_request.json') # TODO need to define what to do with the json
+
+  #   # we have to return the 200 response code so that telegram gets that we have received its msg
+  #   return Response('ok', status=200)
+
+  # else:
+  #   return '<h1> Esperanzo todo Bot </h1>'
