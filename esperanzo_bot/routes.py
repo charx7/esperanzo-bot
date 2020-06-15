@@ -45,18 +45,11 @@ def send_message(chat_id, msg):
   return r
 
 def send_custom_keyboard(chat_id, msg, reply_list):
-  keyboard_replies =  {
-            "inline_keyboard": [[
-                {
-                    "text": "A",
-                    "callback_data": "A1"            
-                }, 
-                {
-                    "text": "B",
-                    "callback_data": "C1"            
-                }]
-            ]
-        }
+  # construct the keyboard options
+  keyboard_ops = [{"text": todo, "callback_data": "/delete " + todo} for todo in reply_list]
+  print(keyboard_ops)
+
+  keyboard_replies =  { "inline_keyboard": [keyboard_ops]}
 
   url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
   # define a json object to send via requests
@@ -77,7 +70,7 @@ def send_callback_response(callback_query_id):
   # define a json object to send via requests
   json = {
     'callback_query_id': callback_query_id,
-    'text': 'button pressed'
+    'text': 'Deleted task 🧹'
   }
 
   return requests.post(url, json=json)
@@ -126,9 +119,6 @@ def index():
       msg_text = callback_data
     else:
       msg_text = msg['message']['text']
-
-
-    print('the message text is: ', msg_text)
 
     #### /greet command logic
     if msg_text == '/greet':
@@ -191,13 +181,24 @@ def index():
           send_message(chat_id, 'You dont have any pending tasks yei!') # respond with the builded list
       
     elif msg_text == '/remove':
-      print('This should remove a todo from the TODO list')
-      t = send_custom_keyboard(chat_id, 'test', [])
-      print(t)
+      # get the todo list
+      found_user = Users.query.filter_by(id = msg_from).first()
+      if found_user:
+        todo_list = []
+        if len(found_user.todos) > 0:
+            for todo in found_user.todos:
+              todo_list.append(todo.todo_text) 
+        
+        res = send_custom_keyboard(chat_id, 'Please select one of the tasks to delete:', todo_list)
+      
+      else:
+        send_message(chat_id, 'You dont have any pending tasks yei!')
+      
       return Response('ok', status = 200)
     
     # TODO the logic of parsing callback and simple commands should be separated
     elif msg_type == 'callback':
+      
       # send the answer to the delete callback query
       res = send_callback_response(callback_query_id)
       write_json(res.json(), 'telegram_request.json') # TODO need to define what to do with the json
