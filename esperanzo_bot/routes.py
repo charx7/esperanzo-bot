@@ -44,20 +44,58 @@ def send_message(chat_id, msg):
   r = requests.post(url, json=json)
   return r
 
-@app.route('/webhook', methods=['GET'])
-def webhook():
-  '''
-    Workaround to set the webhook -> should be another thing
-  '''
-  print('Setting the webhook for telegram')
-  url = f'https://api.telegram.org/bot{BOT_TOKEN}/setWebHook?url={NGROK_URL}'
-  print(url)
-  res = requests.get(url)
-  json_res = res.json()
-  
-  print(json_res['description'])
+def send_custom_keyboard(chat_id, msg, reply_list):
+  keyboard_replies =  {
+            "inline_keyboard": [[
+                {
+                    "text": "A",
+                    "callback_data": "A1"            
+                }, 
+                {
+                    "text": "B",
+                    "callback_data": "C1"            
+                }]
+            ]
+        }
 
-  return json_res
+  url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
+  # define a json object to send via requests
+  json = {
+    'chat_id': chat_id,
+    'text': msg,
+    'reply_markup': keyboard_replies
+  }
+
+  r = requests.post(url, json=json)
+  return r
+
+def send_callback_response(callback_query_id):
+  '''
+    Sends a response to a callback query from the telegram API
+  '''
+  url = f'https://api.telegram.org/bot{BOT_TOKEN}/answerCallbackQuery'
+  # define a json object to send via requests
+  json = {
+    'callback_query_id': callback_query_id,
+    'text': 'button pressed'
+  }
+
+  return requests.post(url, json=json)
+  
+# @app.route('/webhook', methods=['GET'])
+# def webhook():
+#   '''
+#     Workaround to set the webhook -> should be another thing
+#   '''
+#   print('Setting the webhook for telegram')
+#   url = f'https://api.telegram.org/bot{BOT_TOKEN}/setWebHook?url={NGROK_URL}'
+#   print(url)
+#   res = requests.get(url)
+#   json_res = res.json()
+  
+#   print(json_res['description'])
+
+#   return json_res
 
 @app.route("/", methods = ['POST', 'GET'])
 def index():
@@ -65,13 +103,33 @@ def index():
     msg = request.get_json() # the msg obj will be a json sent by telegram
     write_json(msg, 'telegram_request.json')
 
-    chat_id = msg['message']['chat']['id'] # get the chat id to respond
-    msg_from = msg['message']['from']['id'] # get the id of the person that sent the msg
-
+    # TODO this is a weird logic should change it
+    try:
+      msg['callback_query']
+      msg_type = 'callback'
+    except KeyError:
+      msg_type = 'user_text'
+    
+    if msg_type == 'user_text':
+      chat_id = msg['message']['chat']['id'] # get the chat id to respond
+      msg_from = msg['message']['from']['id'] # get the id of the person that sent the msg
+    else:
+      callback_query_id = msg['callback_query']['id'] 
+      msg_from = msg['callback_query']['message']['from']['id']
+      callback_data = msg['callback_query']['data']
+      
     #########################################################################
     ##### Switch statements TODO: this should be processed via NLP and intent
     #########################################################################
-    msg_text = msg['message']['text'] 
+    # TODO this is also wrong should be changed
+    if msg_type == 'callback':
+      msg_text = callback_data
+    else:
+      msg_text = msg['message']['text']
+
+
+    print('the message text is: ', msg_text)
+
     #### /greet command logic
     if msg_text == '/greet':
       send_message(chat_id, 'Hey Patrona! 👋')
@@ -134,6 +192,15 @@ def index():
       
     elif msg_text == '/remove':
       print('This should remove a todo from the TODO list')
+      t = send_custom_keyboard(chat_id, 'test', [])
+      print(t)
+      return Response('ok', status = 200)
+    
+    # TODO the logic of parsing callback and simple commands should be separated
+    elif msg_type == 'callback':
+      # send the answer to the delete callback query
+      res = send_callback_response(callback_query_id)
+      write_json(res.json(), 'telegram_request.json') # TODO need to define what to do with the json
 
     # we have to return the 200 response code so that telegram gets that we have received its msg
     return Response('ok', status=200)
