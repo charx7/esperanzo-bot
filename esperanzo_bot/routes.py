@@ -1,63 +1,18 @@
 import json
 import requests
 import os
-import dotenv
+
+from esperanzo_bot import app # custom package import
+from esperanzo_bot import db
+from esperanzo_bot.models import Users, Todos
 
 from flask import Flask
 from flask import request
 from flask import Response
 from flask_sqlalchemy import SQLAlchemy
 
-# Get env variables TODO should be separated
-dotenv.load_dotenv()
+# get the BOT_TOKEN env variable -> this should be passed from run.py
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-NGROK_URL = os.getenv('NGROK_URL')      
-
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///./esperanzo.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
-
-class Users(db.Model):
-  '''
-    This class defines the users table in which we are going
-    to save the owners of the todos
-  '''
-  __tablename__ = "Users"
-
-  id = db.Column('id', db.Integer, primary_key = True)
-  first_name = db.Column('first_name', db.String(100))
-  last_name = db.Column('last_name', db.String(100))
-  todos = db.relationship('Todos', backref='author', lazy=True)
-
-  def __init__(self, id, first_name, last_name):
-    self.id = id
-    self.first_name = first_name
-    self.last_name = last_name 
-
-  def __str__(self):
-    '''
-      What will be displayed if a User is called from the print() method
-    '''
-    return f'<User id: {self.id}, first_name: {self.first_name}, last_name: {self.last_name}>'
-
-class Todos(db.Model):
-  '''
-    Defines the TODOS table, we are going to save all of our todos here.
-  '''
-  __tablename__ = "TODOS"
-
-  id = db.Column(db.Integer, primary_key=True)
-  todo_text = db.Column(db.String, nullable=False)
-  owner_id = db.Column(db.Integer, db.ForeignKey('Users.id'), nullable = False)
-  #owner_name_relationship = db.relationship('Users', foreign_keys='Todos.owner_id')
-
-  def __init__(self, todo_text, owner_id):
-    self.todo_text = todo_text
-    self.owner_id = owner_id
-
-  def __str__(self):
-    return f'<TODO id: {self.id}, todo: {self.todo_text}, owner_id: {self.owner_id}'
 
 def write_json(data, filename='response.json'):
   '''
@@ -66,7 +21,7 @@ def write_json(data, filename='response.json'):
     Args:
       data (json): json object
   '''
-  with open(filename, 'w') as f:
+  with open('./esperanzo_bot/' + filename, 'w') as f:
     json.dump(data, f, indent=4, ensure_ascii=False)
 
 def send_message(chat_id, msg):
@@ -160,8 +115,7 @@ def index():
         return Response('ok', status = 200)
     
     #### /remind command
-    elif msg['message']['text'] == '/remind':
-      print('should get all todos from the current user')
+    elif msg_text == '/remind':
       # case1 they are not registered
       # case2 they dont have any todos
       # case3 return a list of all the todos
@@ -177,16 +131,12 @@ def index():
           send_message(chat_id, bot_response) # respond with the builded list
         else:
           send_message(chat_id, 'You dont have any pending tasks yei!') # respond with the builded list
-        
+      
+    elif msg_text == '/remove':
+      print('This should remove a todo from the TODO list')
+
     # we have to return the 200 response code so that telegram gets that we have received its msg
     return Response('ok', status=200)
 
   else:
     return '<h1> Esperanzo todo Bot </h1>'
-
-if __name__ == '__main__':
-  db.create_all() #initialize the db if it doesn't already exists
-
-  # if we run the script via the command line it will enter debug mode automatically
-  app.run(debug=True)
-  

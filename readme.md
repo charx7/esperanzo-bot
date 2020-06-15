@@ -4,14 +4,14 @@
 # Basic flask-sqlalchemy commands
 ```
   u1 = app.Users(id = 1, first_name = 'test', last_name= 'test2')
-  app.db.session.add(u1)
-  app.db.session.commit()
-  r = app.Users.query.all()
+  db.session.add(u1)
+  db.session.commit()
+  r = Users.query.all()
   print(r)
 
-  todo1 = app.Todos(todo_text='tienes que..', owner_id=1)
-  app.db.session.add(todo1)
-  app.db.session.commit()
+  todo1 = Todos(todo_text='tienes que..', owner_id=1)
+  db.session.add(todo1)
+  db.session.commit()
   
 ```
 
