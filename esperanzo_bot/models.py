@@ -9,13 +9,11 @@ class Users(db.Model):
 
   id = db.Column('id', db.Integer, primary_key = True)
   first_name = db.Column('first_name', db.String(100))
-  last_name = db.Column('last_name', db.String(100))
   todos = db.relationship('Todos', backref='author', lazy=True)
 
-  def __init__(self, id, first_name, last_name):
+  def __init__(self, id, first_name):
     self.id = id
     self.first_name = first_name
-    self.last_name = last_name 
 
   def __str__(self):
     '''

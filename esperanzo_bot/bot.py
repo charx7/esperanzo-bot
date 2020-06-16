@@ -6,11 +6,12 @@ class TelegramBot:
     self.chat_id = None
     self.msg_from = None
     self.first_name = None
-    self.user_name = None
     self.msg_type = None
     self.msg_text = None
     self._BOT_TOKEN = BOT_TOKEN
     self._NGROK_URL = None
+    self.msg_id = None # maybe not in use
+    self.update_id = None
     self.callback_query_id = None
 
   def send_callback_response(self):
@@ -19,13 +20,13 @@ class TelegramBot:
     '''
     url = f'https://api.telegram.org/bot{self._BOT_TOKEN}/answerCallbackQuery'
     # define a json object to send via requests
+    print('here')
     json = {
       'callback_query_id': self.callback_query_id,
       'text': 'Deleted task 🧹'
     }
 
     return requests.post(url, json=json)
-
 
   def send_custom_keyboard(self, msg, reply_list):
     '''
@@ -34,25 +35,48 @@ class TelegramBot:
       Args:
         chat_id (str): chat_id to send
         msg (str): msg to send
-        reply_list (list<str>): list of elemenents that will appear in the 
+        reply_list (list<str>): list of todo elemenents that will appear in the 
         custom keyboard
     '''
     # construct the keyboard options
-    keyboard_ops = [[{'text': todo, 'callback_data': '/delete ' + todo}] for todo in reply_list]
+    keyboard_ops = [[{'text': todo.todo_text, 'callback_data': '/delete ' + str(todo.id)}] for todo in reply_list]
 
-    print(keyboard_ops[0:2])
-    #keyboard_replies =  { "inline_keyboard": [keyboard_ops]}
     keyboard_replies =  {'inline_keyboard': keyboard_ops,
       # [[{'text': 'holi', 'callback_data': 'dummy'}],
       # [{'text': 'holi2', 'callback_data': 'dummy'}]]
       'resize_keyboard': True}
   
     url = f'https://api.telegram.org/bot{self._BOT_TOKEN}/sendMessage'
-    # define a json object to send via requests
+ 
     json = {
       'chat_id': self.chat_id,
       'text': msg,
       'reply_markup': keyboard_replies
+    }
+
+    r = requests.post(url, json=json)
+    return r
+
+  def edit_reply_markup(self, new_reply_list):
+    # construct the keyboard options
+    keyboard_ops = [[{'text': todo.todo_text, 'callback_data': '/delete ' + str(todo.id)}] for todo in new_reply_list]
+
+    # Dummy data to debug
+    # keyboard_ops =  {'inline_keyboard': [
+    #   [{'text': 'holi', 'callback_data': 'dummy'}],
+    #   [{'text': 'holi2', 'callback_data': 'dummy'}]
+    #   ],
+    #   'resize_keyboard': True}
+    
+    url = f'https://api.telegram.org/bot{self._BOT_TOKEN}/editMessageReplyMarkup'
+    # define a json object to send via requests
+    json = {
+      'chat_id': self.chat_id,
+      'message_id': self.msg_id,
+      'reply_markup': {
+        'inline_keyboard': keyboard_ops,
+        'resize_keyboard': True
+      }
     }
 
     r = requests.post(url, json=json)

@@ -10,6 +10,7 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///./esperanzo.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+# TODO import User and Todos so that the tables get create with the command
 db.create_all() #initialize the db if it doesn't already exists
 
 from esperanzo_bot import routes # import the routes
