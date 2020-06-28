@@ -5,8 +5,7 @@ import requests
 from esperanzo_bot import app
 
 if __name__ == '__main__':
-  hostname = os.uname()[1]
-  
+  hostname = os.uname()[1]  
   if hostname == 'flask-server':
     # deploy
     print('should run gce deployment')

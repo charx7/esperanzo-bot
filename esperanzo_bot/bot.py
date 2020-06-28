@@ -115,17 +115,21 @@ class TelegramBot:
 
 
   @staticmethod
-  def webhook(BOT_TOKEN, NGROK_URL):
+  def webhook(BOT_TOKEN, HOOK_URL, hostname):
     '''
       Method sets the webhook -> should be another thing
     '''
     print('Setting the webhook for telegram')
-    url = f'https://api.telegram.org/bot{BOT_TOKEN}/setWebHook?url={NGROK_URL}'
-    print(url)
-    res = requests.get(url)
-    json_res = res.json()
-    
-    print(json_res['description'])
+    if hostname == 'flask-server':
+      # set the webhook for deployment
+      url = f'https://api.telegram.org/bot{BOT_TOKEN}/setWebHook?url={HOOK_URL}'
+    else:
+      url = f'https://api.telegram.org/bot{BOT_TOKEN}/setWebHook?url={HOOK_URL}'
+      print(url)
+      res = requests.get(url)
+      json_res = res.json()
+      
+      print(json_res['description'])
 
     return json_res
 

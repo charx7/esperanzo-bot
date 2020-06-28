@@ -17,8 +17,9 @@ from flask_sqlalchemy import SQLAlchemy
 # Get env variables TODO should be separated
 dotenv.load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-NGROK_URL = os.getenv('NGROK_URL')      
-TelegramBot.webhook(BOT_TOKEN, NGROK_URL)
+HOOK_URL = os.getenv('HOOK_URL') 
+hostname = os.uname()[1] # hostname to differentiate between prod and dev
+TelegramBot.webhook(BOT_TOKEN, HOOK_URL, hostname)
 bot = TelegramBot(BOT_TOKEN)
 
 @app.route("/", methods = ['POST', 'GET'])
