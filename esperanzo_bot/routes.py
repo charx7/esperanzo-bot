@@ -125,3 +125,6 @@ def index():
         bot.send_message('You dont have any pending tasks yeah!')
       
     return Response('ok', status=200)
+  else:
+    return 'Esperanzo-BOT API'
+    
