@@ -1,4 +1,38 @@
 # Cloud deployment
+## Create a self-signed certificate
+In order to connect to telegram via a webhook we are going to need to establish an ssl connection, we will use a self-signed certificate. Ref https://stackoverflow.com/questions/45251809/telegram-getwebhookinfo-returns-ssl-error-ssl-routinestls-process-server-cert?noredirect=1&lq=1
+```
+  sudo openssl req -newkey rsa:2048 -sha256 -nodes -keyout PRIVATE.key -x509 -days 365 -out PUBLIC.pem -subj "/C=US/ST=New York/L=Brooklyn/O=Example Brooklyn Company/CN=<GCE_EXTERNAL_IP>"
+```
+Afterwards we need to setup nginx for the reverse proxy configuration:
+```
+  vim /etc/nginx/sites-available/esperanzo
+  ...
+  server {
+  listen 80;
+  listen 443 ssl;
+  server_name <GCE_EXTERNAL_IP>;
+  ssl_certificate /home/PUBLIC.pem;
+  ssl_certificate_key /home/PRIVATE.key;
+
+  location /<BOT_TOKEN> {
+    proxy_set_header Host $http_host;
+    proxy_redirect off;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Scheme $scheme;
+    proxy_pass http://0.0.0.0:5000/;
+    }
+  }
+  ...
+```
+
+## Manually set the webhook
+`curl -F "url=https://<GCE_EXTERNAL_IP>/<BOT_TOKEN>" -F "certificate=@/home/PUBLIC.pem" https://api.telegram.org/bot<BOT_TOKEN>/setWebhook`
+
+## Debug webhook
+`https://api.telegram.org/bot<BOT_TOKEN>/getWebhookinfo`
+
 ## Set-up hostname to deploy to production 
 `sudo hostnamectl set-hostname flask-server`
 ## Change the hostname
