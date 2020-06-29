@@ -53,10 +53,36 @@ To run flask on an specific port
 ```
 To run it with `gunicorn` while on the venv and with gunicorn installed:
 ```
-  #gunicorn -w <number of workers> <Name of the script>:<name of the flask app>
-  gunicorn -w 1 run:app
+  #gunicorn -w <number of workers> <Name of the script>:<name of the flask app> --bind localhost:5000
+  gunicorn -w 1 run:app --bind localhost:5000
 ```
 To run in debug mode just execute the `run.py` script while on the virtual environment
+
+# Bot as a service
+Using the `supervisor`, install it via `sudo apt install supervisor`. Then create a configure file for the service tool.
+```
+  vim /etc/supervisor/conf.d/esperanzo-bot.conf
+  ...
+  [program:esperanzo-bot]
+
+  directory=/home/<VM_USERNAME>/esperanzo-bot
+  command=/home/<VM_USERNAME>/<PATH_TO_VENV_FOLDER>/bin/guinicorn -w 1 run:app --bind localhost:5000
+  user=<VM_USERNAME>
+  autostart=true
+  autorestart=true
+  stopasgroup=true
+  killasgroup=true
+  stderr_logfile=/var/log/esperanzo-bot/esperanzo-bot.err.log
+  stdout_logfile=/var/log/esperanzo-bot/esperanzo-bot.out.log
+  ...
+```
+Now we need to create the directory and files for our log outputs.
+```
+  sudo mkdir -p /var/log/esperanzo-bot
+  sudo touch /var/log/esperanzo-bot/esperanzo-bot.err.log
+  sudo touch /var/log/esperanzo-bot/esperanzo-bot.out.log
+```
+Run via supervisor `sudo service supervisor start` or `sudo supervisorctl reload`, debug with `sudo supervisorctl`. To stop/start type the command `start esperanzo-bot` or `stop esperanzo-bot`. 
 
 # Ngrok commands
 `./ngrok http 5000`
