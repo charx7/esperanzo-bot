@@ -122,13 +122,15 @@ class TelegramBot:
     print('Setting the webhook for telegram')
     if hostname == 'flask-server':
       # set the webhook for deployment
-      url = f'https://api.telegram.org/bot{BOT_TOKEN}/setWebHook?url={HOOK_URL}'
-      cert_path = '/home/PUBLIC.pem'
-      key_path = '/home/PRIVATE.pem'
-      cert = (cert_path, key_path)
-      print('the paths are: ',cert_path, ' ',key_path)
-      res = requests.get(url, cert=cert)
-
+      url = f'https://api.telegram.org/bot{BOT_TOKEN}/setWebHook'#?url={HOOK_URL}'
+      files = {
+        'certificate': open('/home/PUBLIC.pem','rb')
+      }
+      payload = {
+        'url': 'https://35.184.188.118/1019733179:AAERy1XSvGiApVOGaVBfSFXdHHnhy-hAn9w'
+      }
+      res = requests.post(url, data=payload, files=files)
+       
     else:
       url = f'https://api.telegram.org/bot{BOT_TOKEN}/setWebHook?url={HOOK_URL}'
       print(url)
